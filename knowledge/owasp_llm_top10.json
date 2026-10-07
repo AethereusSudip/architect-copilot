@@ -1,0 +1,12 @@
+[
+ {"id":"LLM01","name":"Prompt Injection","question":"Can brief or document content alter the agent's instructions?"},
+ {"id":"LLM02","name":"Sensitive Information Disclosure","question":"Could the output leak personal, client or confidential data?"},
+ {"id":"LLM03","name":"Supply Chain","question":"Are models, plugins and datasets from approved sources?"},
+ {"id":"LLM04","name":"Data and Model Poisoning","question":"Is the knowledge file controlled and reviewed?"},
+ {"id":"LLM05","name":"Improper Output Handling","question":"Is generated code or diagram text validated before use?"},
+ {"id":"LLM06","name":"Excessive Agency","question":"Can the agent finalize decisions without human approval?"},
+ {"id":"LLM07","name":"System Prompt Leakage","question":"Does the system prompt hold secrets or internal rules?"},
+ {"id":"LLM08","name":"Vector and Embedding Weaknesses","question":"If retrieval is used, is access to documents controlled?"},
+ {"id":"LLM09","name":"Misinformation","question":"Are claims, service names and limits flagged for validation?"},
+ {"id":"LLM10","name":"Unbounded Consumption","question":"Are token limits, retries and cost per run capped?"}
+]

@@ -1,0 +1,315 @@
+{
+ "intake": {
+  "functional": [
+   "Online application forms with save-and-resume and e-signature",
+   "Document upload with a checklist per application type",
+   "Reviewer work queue, approval workflow and correspondence templates",
+   "Nightly integrations with finance and student data systems",
+   "Real-time payment provider integration",
+   "Migration of about 20 years of records and scanned files"
+  ],
+  "nfrs": [
+   "About 450 institutions and 60 internal users",
+   "Peak load in a two-week filing window each year",
+   "Data residency: United States only",
+   "Accessibility: WCAG 2.1 AA"
+  ],
+  "constraints": [
+   "Small delivery team",
+   "Go-live within 12 months",
+   "Must use the existing identity provider",
+   "Cloud preference open (Azure or AWS)"
+  ],
+  "assumptions": [
+   "Peak concurrency is below 500 simultaneous users",
+   "Scanned files total under 5 TB",
+   "Business hours support is sufficient outside the filing window"
+  ],
+  "unknowns": [
+   "Availability target",
+   "RTO and RPO",
+   "Retention period for records",
+   "Audit logging scope",
+   "Expected file volume growth"
+  ]
+ },
+ "clarify": {
+  "questions": [
+   {
+    "q": "What availability target applies during the filing window versus the rest of the year?",
+    "why": "Drives multi-AZ design, cost and failover testing."
+   },
+   {
+    "q": "What are the RTO and RPO for application data and uploaded documents?",
+    "why": "Determines backup, replication and storage tier choices."
+   },
+   {
+    "q": "What retention and legal-hold rules apply to migrated records?",
+    "why": "Affects archive design and delete behaviour."
+   },
+   {
+    "q": "Does the existing identity provider support SAML or OIDC for external institutions?",
+    "why": "Decides the sign-in integration pattern."
+   },
+   {
+    "q": "Roughly how many files and how many GB per year are expected?",
+    "why": "Sizes storage, scanning and migration throughput."
+   }
+  ]
+ },
+ "options": {
+  "options": [
+   {
+    "id": "A",
+    "name": "Modular monolith on managed PaaS",
+    "summary": "One deployable web application with clear internal modules (applications, documents, workflow, payments), a managed relational database and object storage. Integrations run as scheduled jobs and a small payment adapter.",
+    "candidate_services": {
+     "azure": [
+      "App Service",
+      "Azure SQL",
+      "Blob Storage",
+      "Key Vault",
+      "Functions (scheduled jobs)"
+     ],
+     "aws": [
+      "ECS Fargate",
+      "RDS",
+      "S3",
+      "Secrets Manager",
+      "EventBridge Scheduler"
+     ]
+    }
+   },
+   {
+    "id": "B",
+    "name": "Event-driven microservices",
+    "summary": "Separate services per domain communicating through a message broker, each with its own data store, behind an API gateway.",
+    "candidate_services": {
+     "azure": [
+      "AKS",
+      "Service Bus",
+      "API Management",
+      "Cosmos DB",
+      "Blob Storage"
+     ],
+     "aws": [
+      "EKS",
+      "SQS/SNS",
+      "API Gateway",
+      "DynamoDB",
+      "S3"
+     ]
+    }
+   }
+  ]
+ },
+ "tradeoff": {
+  "criteria": [
+   "cost",
+   "complexity",
+   "security",
+   "scalability",
+   "resiliency",
+   "maintainability",
+   "delivery speed"
+  ],
+  "scores": {
+   "A": {
+    "cost": {
+     "score": 4,
+     "note": "Fewer moving parts, lower run cost"
+    },
+    "complexity": {
+     "score": 4,
+     "note": "One deployable, simple to operate"
+    },
+    "security": {
+     "score": 4,
+     "note": "Single trust boundary, managed controls"
+    },
+    "scalability": {
+     "score": 3,
+     "note": "Scales vertically and by instance count, enough for 450 institutions"
+    },
+    "resiliency": {
+     "score": 3,
+     "note": "Multi-AZ managed services, simpler failover"
+    },
+    "maintainability": {
+     "score": 4,
+     "note": "Modules keep code organised for a small team"
+    },
+    "delivery speed": {
+     "score": 5,
+     "note": "Fastest path to 12-month go-live"
+    }
+   },
+   "B": {
+    "cost": {
+     "score": 2,
+     "note": "Higher platform and tooling cost"
+    },
+    "complexity": {
+     "score": 2,
+     "note": "Many services, brokers and pipelines"
+    },
+    "security": {
+     "score": 3,
+     "note": "More surfaces to secure"
+    },
+    "scalability": {
+     "score": 5,
+     "note": "Independent scaling per service"
+    },
+    "resiliency": {
+     "score": 4,
+     "note": "Isolated failures"
+    },
+    "maintainability": {
+     "score": 3,
+     "note": "Needs strong platform skills"
+    },
+    "delivery speed": {
+     "score": 2,
+     "note": "Longer build and setup time"
+    }
+   }
+  }
+ },
+ "recommendation": {
+  "recommended_id": "A",
+  "rationale": "The workload is moderate (about 450 institutions, 60 internal users) with a short seasonal peak. A modular monolith on managed PaaS meets the scale need, fits a small team and the 12-month deadline, and keeps one security boundary. Microservices add cost and operational complexity that the stated scale does not justify. Clear module boundaries keep a later split possible.",
+  "risks": [
+   "Peak-window load is assumed, not measured",
+   "Availability and RTO/RPO targets are unknown",
+   "Large file migration may need a dedicated transfer path"
+  ],
+  "confidence": "Medium - several NFRs are missing and assumptions are unvalidated",
+  "review_notes": "Candidate cloud services need validation against the agency's approved catalogue and compliance rules. Final decision rests with the architect."
+ },
+ "adr": {
+  "markdown": "# ADR-001: Application architecture for the licensing portal\n\n**Status:** Proposed - pending architect approval\n\n## Context\nAgency X (simulated) is replacing a legacy mainframe licensing system with a cloud portal for about 450 institutions and 60 internal users. There is a two-week annual peak, US-only data residency, WCAG 2.1 AA, an existing identity provider, a small team and a 12-month deadline.\n\n## Decision\nAdopt a modular monolith on managed PaaS with a managed relational database, object storage for documents, scheduled jobs for nightly integrations and a small adapter for the payment provider. Candidate platforms: Azure (App Service, Azure SQL, Blob Storage) or AWS (ECS Fargate, RDS, S3). Platform choice is to be validated.\n\n## Alternatives considered\n- **Event-driven microservices:** better independent scaling, but higher cost, complexity and delivery time than the scale requires.\n\n## Consequences\n- Faster delivery and simpler operations.\n- Module boundaries must be enforced to avoid a tangled monolith.\n- Scaling is by instance count rather than per service.\n\n## Assumptions\n- Peak concurrency below 500 users\n- Scanned files under 5 TB\n\n## Risks\n- Unknown availability and RTO/RPO targets\n- Peak load not yet tested\n\n## Confidence\nMedium.\n\n## Review notes\nValidate cloud services against the agency catalogue. Architect approval required before publishing."
+ },
+ "diagram": {
+  "mermaid": "flowchart LR\n  U[Institutions and reviewers] --> IDP[Existing identity provider]\n  U --> W[Web app - modular monolith]\n  IDP --> W\n  W --> DB[(Managed relational database)]\n  W --> OBJ[(Object storage - documents)]\n  W --> PAY[Payment provider]\n  JOB[Scheduled jobs] --> FIN[Finance system]\n  JOB --> SDS[Student data system]\n  W --> JOB\n  W --> MON[Monitoring and audit logs]\n  KV[Secrets vault] --> W",
+  "prompt": "Draw a left-to-right architecture diagram. Users (institutions, reviewers) sign in through an existing identity provider and use a web application built as a modular monolith. The app uses a managed relational database and object storage for documents, calls a payment provider in real time, and publishes to scheduled jobs that exchange nightly files with a finance system and a student data system. A secrets vault feeds the app, and monitoring with audit logs receives telemetry. Label as candidate design, review required."
+ },
+ "summary": {
+  "slides": [
+   {
+    "title": "The challenge",
+    "bullets": [
+     "Replace a legacy mainframe licensing system",
+     "About 450 institutions, 60 internal users, annual two-week peak",
+     "12-month delivery with a small team"
+    ]
+   },
+   {
+    "title": "Options compared",
+    "bullets": [
+     "A: modular monolith on managed PaaS",
+     "B: event-driven microservices",
+     "Scored on cost, complexity, security, scalability, resiliency, maintainability, speed"
+    ]
+   },
+   {
+    "title": "Recommended direction (candidate)",
+    "bullets": [
+     "Option A fits scale, team and timeline",
+     "Clear modules keep a later split possible",
+     "Cloud services are candidates pending validation"
+    ]
+   },
+   {
+    "title": "Caveats",
+    "bullets": [
+     "Availability, RTO/RPO and retention not yet defined",
+     "Peak load and file volume are assumptions",
+     "Confidence: Medium"
+    ]
+   },
+   {
+    "title": "Next steps",
+    "bullets": [
+     "Architect confirms assumptions and answers open questions",
+     "Validate services with the agency catalogue",
+     "Run a peak-load test on a prototype"
+    ]
+   }
+  ]
+ },
+ "risk_review": {
+  "items": [
+   {
+    "id": "LLM01",
+    "name": "Prompt Injection",
+    "status": "Pass",
+    "finding": "Brief is treated as data; no tool actions are triggered by its content.",
+    "control": "Delimit input, never execute brief text."
+   },
+   {
+    "id": "LLM02",
+    "name": "Sensitive Information Disclosure",
+    "status": "Pass",
+    "finding": "Input is simulated and passed the PII check.",
+    "control": "Sanitization check before every run."
+   },
+   {
+    "id": "LLM03",
+    "name": "Supply Chain",
+    "status": "Warn",
+    "finding": "Model and libraries come from public sources.",
+    "control": "Use only approved model endpoints and pinned dependencies."
+   },
+   {
+    "id": "LLM04",
+    "name": "Data and Model Poisoning",
+    "status": "Pass",
+    "finding": "Knowledge file is local and reviewed.",
+    "control": "Version control and review for knowledge files."
+   },
+   {
+    "id": "LLM05",
+    "name": "Improper Output Handling",
+    "status": "Warn",
+    "finding": "Mermaid text is rendered in the browser.",
+    "control": "Render in a sandbox and review before sharing."
+   },
+   {
+    "id": "LLM06",
+    "name": "Excessive Agency",
+    "status": "Pass",
+    "finding": "Three approval gates block finalization.",
+    "control": "Architect approves assumptions, option and ADR."
+   },
+   {
+    "id": "LLM07",
+    "name": "System Prompt Leakage",
+    "status": "Pass",
+    "finding": "System prompt contains no secrets.",
+    "control": "Keep keys in environment variables."
+   },
+   {
+    "id": "LLM08",
+    "name": "Vector and Embedding Weaknesses",
+    "status": "Pass",
+    "finding": "No retrieval index is used in this PoC.",
+    "control": "Add access control if retrieval is added."
+   },
+   {
+    "id": "LLM09",
+    "name": "Misinformation",
+    "status": "Review",
+    "finding": "Service names and limits may be outdated.",
+    "control": "Validate every candidate service against vendor documentation."
+   },
+   {
+    "id": "LLM10",
+    "name": "Unbounded Consumption",
+    "status": "Pass",
+    "finding": "Max tokens and one call per stage are set.",
+    "control": "Cap tokens and retries per run."
+   }
+  ]
+ }
+}
