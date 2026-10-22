@@ -1,0 +1,127 @@
+openapi: 3.0.3
+info:
+  title: Licensing Portal API
+  version: 0.1.0-draft
+  description: |
+    Contract for the licensing portal modular monolith (ADR-001).
+    ASSUMPTION: one API surface served by the single web app; modules map to path prefixes.
+servers:
+  - url: https://<API_HOST>/v1
+    description: Placeholder. Replace per environment.
+security:
+  - oidc: []
+paths:
+  /applications:
+    get:
+      summary: List the caller's applications
+      tags: [applications]
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ApplicationStatus' } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Application' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Start a new application (saved as draft)
+      tags: [applications]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/NewApplication' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Application' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /applications/{applicationId}:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    get:
+      summary: Get an application and its status
+      tags: [applications]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Application' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Save progress (save-and-resume)
+      tags: [applications]
+      requestBody:
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses:
+        '200': { description: Saved }
+  /applications/{applicationId}/documents:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      summary: Upload a supporting document
+      tags: [documents]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                checklistItem: { type: string }
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Uploaded }
+        '413': { description: File too large (REVIEW: size limit not stated in ADR) }
+  /applications/{applicationId}/submit:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      summary: Submit a completed application for review
+      tags: [applications]
+      responses:
+        '202': { description: Submitted to the reviewer queue }
+        '409': { description: Checklist incomplete }
+  /applications/{applicationId}/payments:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      summary: Start a fee payment with the payment provider (redirect flow, no card data stored)
+      tags: [payments]
+      responses:
+        '201': { description: Payment session created, content: { application/json: { schema: { type: object, properties: { redirectUrl: { type: string, format: uri } } } } } }
+  /reviews/queue:
+    get:
+      summary: Reviewer work queue
+      tags: [workflow]
+      security: [ { oidc: [reviewer] } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Application' } } } } }
+  /reviews/{applicationId}/decision:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      summary: Record an approval decision
+      tags: [workflow]
+      security: [ { oidc: [reviewer] } ]
+      requestBody:
+        content: { application/json: { schema: { $ref: '#/components/schemas/Decision' } } }
+      responses:
+        '200': { description: Decision recorded and audited }
+components:
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://<IDP_ISSUER_URL>/.well-known/openid-configuration
+  parameters:
+    ApplicationId: { name: applicationId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    BadRequest: { description: Invalid request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Not signed in }
+    NotFound: { description: Not found }
+  schemas:
+    ApplicationStatus: { type: string, enum: [draft, submitted, in_review, approved, rejected] }
+    NewApplication:
+      type: object
+      required: [applicationType]
+      properties: { applicationType: { type: string } }
+    Application:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        applicationType: { type: string }
+        status: { $ref: '#/components/schemas/ApplicationStatus' }
+        updatedAt: { type: string, format: date-time }
+    Decision:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { type: string, enum: [approve, reject, request_info] }
+        note: { type: string }
+    Error:
+      type: object
+      properties: { code: { type: string }, message: { type: string } }

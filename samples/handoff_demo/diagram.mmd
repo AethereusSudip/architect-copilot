@@ -1,0 +1,30 @@
+flowchart LR
+  subgraph Users
+    INST[Institutions]
+    REV[Internal reviewers]
+  end
+  IDP[Existing identity provider - OIDC]
+  subgraph Azure["Azure - US region (candidate services)"]
+    APP[App Service - licensing portal modular monolith]
+    SQL[(Azure SQL Database)]
+    BLOB[(Blob Storage - application documents)]
+    KV[Key Vault]
+    FN[Functions - nightly jobs]
+    MON[Application Insights + Log Analytics]
+  end
+  PAY[Payment provider]
+  FIN[Finance system]
+  SDS[Student data system]
+
+  INST --> APP
+  REV --> APP
+  APP -- sign-in --> IDP
+  APP --> SQL
+  APP --> BLOB
+  KV -. secrets via managed identity .-> APP
+  APP -- real-time payment --> PAY
+  FN -- nightly export --> FIN
+  SDS -- nightly import --> FN
+  FN --> SQL
+  APP --> MON
+  FN --> MON

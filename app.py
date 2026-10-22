@@ -1,4 +1,5 @@
 """Architecture Decision & Risk Review Agent - Streamlit demo."""
+import html
 import pathlib
 
 import streamlit as st
@@ -104,7 +105,7 @@ if S["step"] >= 3:
     with t2:
         mermaid = state["diagram"]["mermaid"]
         components.html(
-            f'<pre class="mermaid">{mermaid}</pre>'
+            f'<pre class="mermaid">{html.escape(mermaid)}</pre>'
             '<script type="module">import m from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";m.initialize({startOnLoad:true});</script>',
             height=420, scrolling=True)
         st.code(mermaid, language="text")
@@ -128,3 +129,4 @@ if S["step"] >= 4:
     st.header("5. Exported")
     st.success(f"Saved to {state['export_dir']}")
     st.write(sorted(p.name for p in pathlib.Path(state["export_dir"]).iterdir()))
+    st.info("Next: open **Coding Assistant** in the sidebar to turn this approved ADR into a developer handoff package.")

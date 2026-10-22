@@ -34,7 +34,7 @@ def _extract_json(text):
     return json.loads(match.group(0))
 
 
-def run_stage(stage, mode, **variables):
+def run_stage(stage, mode, max_tokens=4000, **variables):
     if mode == "demo":
         return load_json("samples/demo_run.json")[{"recommend": "recommendation"}.get(stage, stage)]
 
@@ -43,7 +43,7 @@ def run_stage(stage, mode, **variables):
     client = anthropic.Anthropic()
     response = client.messages.create(
         model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
-        max_tokens=4000,
+        max_tokens=max_tokens,
         temperature=0.2,
         system=SYSTEM,
         messages=[{"role": "user", "content": _prompt(stage, variables)}],
