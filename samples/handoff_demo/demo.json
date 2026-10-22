@@ -1,0 +1,320 @@
+{
+ "inputs": {
+  "target_cloud": "Azure",
+  "names": "licensing-portal (resource prefix: licportal)"
+ },
+ "extract": {
+  "title": "ADR-001: Application architecture for the licensing portal",
+  "status": "Proposed - pending architect approval",
+  "decisions": [
+   "Modular monolith: one deployable web application with internal modules (applications, documents, workflow, payments)",
+   "Managed relational database for application data",
+   "Object storage for uploaded and migrated documents",
+   "Scheduled jobs for the nightly finance and student data integrations",
+   "Small adapter for the real-time payment provider",
+   "Candidate platforms: Azure (App Service, Azure SQL, Blob Storage) or AWS (ECS Fargate, RDS, S3), to be validated"
+  ],
+  "rejected_alternatives": [
+   "Event-driven microservices (higher cost, complexity and delivery time than the scale requires)"
+  ],
+  "rejected_terms": [
+   "microservice",
+   "kubernetes",
+   "aks",
+   "eks",
+   "cosmos",
+   "dynamodb"
+  ],
+  "constraints": [
+   "Small delivery team",
+   "Go-live within 12 months",
+   "Must use the existing identity provider",
+   "Module boundaries must be enforced"
+  ],
+  "nfrs": [
+   "About 450 institutions and 60 internal users",
+   "Two-week annual filing peak",
+   "US-only data residency",
+   "WCAG 2.1 AA"
+  ],
+  "components": [
+   "Web app (modular monolith)",
+   "Relational database",
+   "Document object storage",
+   "Scheduled jobs",
+   "Payment adapter",
+   "Secrets vault",
+   "Monitoring and audit logs"
+  ],
+  "integrations": [
+   "Existing identity provider (sign-in)",
+   "Payment provider (real time)",
+   "Finance system (nightly)",
+   "Student data system (nightly)"
+  ],
+  "deployment_targets": [
+   "Azure (selected for this pack, to validate)",
+   "US regions only"
+  ],
+  "open_questions": [
+   "Availability target",
+   "RTO and RPO",
+   "Records retention period",
+   "Audit logging scope",
+   "Expected file volume growth",
+   "Final cloud platform (Azure or AWS)"
+  ],
+  "conflicts": [
+   "The ADR status is still Proposed; generate drafts only and get the ADR approved before handing off"
+  ]
+ },
+ "artifacts": {
+  "scaffold": {
+   "file": "scaffold.md",
+   "assumptions": [
+    "Python web stack",
+    "Migration plan kept as a separate workstream"
+   ],
+   "conflicts": [],
+   "review_notes": "Confirm the module list and stack with the delivery team."
+  },
+  "api": {
+   "file": "openapi.yaml",
+   "assumptions": [
+    "One API surface served by the web app",
+    "Payment uses the provider's redirect flow"
+   ],
+   "conflicts": [],
+   "review_notes": "Document size limits and correspondence endpoints are not yet defined."
+  },
+  "iac": {
+   "file": "main.tf",
+   "assumptions": [
+    "P1v3 plan and S2 database sized for under 500 concurrent users",
+    "ZRS storage until RTO/RPO are known"
+   ],
+   "conflicts": [],
+   "review_notes": "Nightly job Functions and payment egress rules are not included yet."
+  },
+  "diagram": {
+   "file": "diagram.mmd",
+   "assumptions": [
+    "Nightly jobs run on Azure Functions"
+   ],
+   "conflicts": [],
+   "review_notes": "Matches the IaC except Functions, which are still a TODO in the Terraform."
+  },
+  "readme": {
+   "file": "README.md",
+   "assumptions": [
+    "Sandbox subscription available for plan runs"
+   ],
+   "conflicts": [],
+   "review_notes": "Update local setup once the stack is confirmed."
+  },
+  "checklist": {
+   "file": "checklist.md",
+   "assumptions": [],
+   "conflicts": [],
+   "review_notes": "Every item traces to ADR-001 or a guardrail."
+  }
+ },
+ "review": {
+  "scaffold": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "Modules match the ADR decision and stay in one deployable app.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Pass",
+    "finding": "Secrets referenced by name only; .env.example has no values.",
+    "fix": "None"
+   },
+   {
+    "area": "Observability",
+    "status": "Pass",
+    "finding": "Shared telemetry module included.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Warn",
+    "finding": "Stack choice (Python) is an assumption, not an ADR decision.",
+    "fix": "Confirm the approved stack before creating repositories."
+   }
+  ],
+  "api": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "Single API surface for the modular monolith; covers applications, documents, workflow and payments.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Pass",
+    "finding": "OIDC security scheme; reviewer endpoints need the reviewer scope; no card data in the contract.",
+    "fix": "None"
+   },
+   {
+    "area": "NFRs",
+    "status": "Warn",
+    "finding": "Upload size limit and correspondence templates are not specified.",
+    "fix": "Agree limits and add the correspondence endpoints."
+   },
+   {
+    "area": "Safe AI",
+    "status": "Pass",
+    "finding": "Server and issuer URLs are placeholders.",
+    "fix": "None"
+   }
+  ],
+  "iac": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "App Service, Azure SQL and Blob Storage match the ADR's Azure candidates.",
+    "fix": "None"
+   },
+   {
+    "area": "NFRs",
+    "status": "Pass",
+    "finding": "Location variable is validated to US regions.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Fail",
+    "finding": "The SQL administrator password is hardcoded and there is no Key Vault, which breaks the 'no secrets in code' guardrail.",
+    "fix": "Generate the password, store it in Key Vault and give the web app a managed identity with a Key Vault reference."
+   },
+   {
+    "area": "Observability",
+    "status": "Pass",
+    "finding": "Application Insights backed by Log Analytics is wired into the web app.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Warn",
+    "finding": "SKUs are assumptions and Functions for nightly jobs are missing.",
+    "fix": "Validate SKUs after a peak-window load test and add the Functions."
+   }
+  ],
+  "diagram": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "Shows one web app, database, storage, jobs and payment adapter as decided.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Pass",
+    "finding": "Secrets flow from Key Vault through managed identity.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Warn",
+    "finding": "Diagram shows Key Vault and Functions, which the first IaC draft does not create.",
+    "fix": "Keep the diagram and IaC consistent after refinement."
+   }
+  ],
+  "readme": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "States the ADR it implements and that the platform choice is a candidate.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Pass",
+    "finding": "Tells developers never to commit .env and to use sandbox subscriptions only.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Pass",
+    "finding": "Marks all files as drafts and lists open questions.",
+    "fix": "None"
+   }
+  ],
+  "checklist": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "Items trace to ADR decisions and consequences.",
+    "fix": "None"
+   },
+   {
+    "area": "NFRs",
+    "status": "Pass",
+    "finding": "Covers residency, peak load, accessibility and open availability targets.",
+    "fix": "None"
+   },
+   {
+    "area": "Observability",
+    "status": "Pass",
+    "finding": "Includes telemetry, audit and alerting items.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Pass",
+    "finding": "Requires draft labels, validation of service names and sandbox validation.",
+    "fix": "None"
+   }
+  ]
+ },
+ "refine": {
+  "kind": "iac",
+  "instruction": "Remove the hardcoded SQL password: generate it, store it in Key Vault and let the web app read it through a managed identity.",
+  "result": {
+   "file": "main_refined.tf",
+   "assumptions": [
+    "P1v3 plan and S2 database sized for under 500 concurrent users",
+    "ZRS storage until RTO/RPO are known",
+    "Key Vault uses RBAC authorization"
+   ],
+   "conflicts": [],
+   "review_notes": "Added Key Vault, a generated SQL admin password stored as a secret, a system-assigned identity for the web app with the Key Vault Secrets User role, and a Key Vault reference app setting. Admin login is now a variable."
+  },
+  "review": [
+   {
+    "area": "ADR alignment",
+    "status": "Pass",
+    "finding": "Still App Service, Azure SQL and Blob Storage as decided.",
+    "fix": "None"
+   },
+   {
+    "area": "NFRs",
+    "status": "Pass",
+    "finding": "Location variable is validated to US regions.",
+    "fix": "None"
+   },
+   {
+    "area": "Security",
+    "status": "Pass",
+    "finding": "No secret literals; password generated and held in Key Vault; app uses managed identity.",
+    "fix": "None"
+   },
+   {
+    "area": "Observability",
+    "status": "Pass",
+    "finding": "Application Insights wired into the web app.",
+    "fix": "None"
+   },
+   {
+    "area": "Safe AI",
+    "status": "Warn",
+    "finding": "SKUs are assumptions and Functions for nightly jobs are still missing.",
+    "fix": "Validate SKUs after a peak-window load test and add the Functions."
+   }
+  ]
+ }
+}
